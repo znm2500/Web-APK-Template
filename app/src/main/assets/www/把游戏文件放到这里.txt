@@ -1,0 +1,16 @@
+【使用说明 / Usage】
+
+把网页游戏资源放进本目录（app/src/main/assets/www/），然后构建 APK 即可。
+
+规则只有两条：
+1. 入口文件必须命名为 index.html，放在本目录根部
+2. 资源用相对路径引用（多文件项目把 index.html、script.js、assets/ 等
+   整个目录结构原样复制进来即可，支持子目录和中文文件名）
+
+支持形态：
+- 单文件游戏：Scratch / TurboWarp / PenguinMod Packager 导出的单个 HTML
+  （资源全内嵌，一个文件搞定）
+- 多文件游戏：index.html + script.js + assets/ 等目录结构
+  （内置 HTTP 服务器递归映射全部子路径，支持音频/视频分段加载）
+
+删除本占位文件不影响运行。
