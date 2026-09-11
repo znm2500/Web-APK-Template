@@ -13,3 +13,6 @@
 .externalNativeBuild
 .cxx
 local.properties
+
+# WorkBuddy 工作记忆与项目数据
+.workbuddy/
