@@ -12,6 +12,7 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
+import java.lang.ref.WeakReference
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.core.view.WindowInsetsCompat
@@ -28,6 +29,10 @@ import java.io.SequenceInputStream
 // true = 走内置 NanoHTTPD（http://127.0.0.1:8080）
 // false = 与 template.c2.APK 一样用 file:// 直读 assets（A/B 排查用）
 private const val USE_HTTP_SERVER = true
+
+// 当前 WebView 的弱引用：返回键回调用它向页面派发 backbutton 事件。
+// 弱引用避免 Activity 销毁后泄漏 WebView。
+private var activeWebView: WeakReference<WebView>? = null
 
 private const val BOOT_PATCH_MARK = "__wb_boot_fix__"
 
@@ -97,7 +102,11 @@ class MainActivity : ComponentActivity() {
             Log.e("MainActivity", "Failed to start LocalWebServer", e)
         }
 
-        // 双击返回键才退出，防止游戏中误触直接杀进程
+        // 双击返回键才退出，防止游戏中误触直接杀进程。
+        // 单击返回键时，向页面派发 Cordova 风格的 backbutton 事件：
+        // Web-Packer 注入的 controls.js 只在 backbutton 事件里呼出/切换触屏键盘
+        // （浏览器 keydown 在 Android 返回键上不会触发，不派发的话键盘永远呼不出）。
+        // 对没有 controls.js 的页面，派发一个无人监听的事件完全无害。
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             private var lastBackPressTime = 0L
             override fun handleOnBackPressed() {
@@ -106,6 +115,9 @@ class MainActivity : ComponentActivity() {
                     finish()
                 } else {
                     lastBackPressTime = now
+                    activeWebView?.get()?.evaluateJavascript(
+                        "document.dispatchEvent(new Event('backbutton'))", null
+                    )
                     Toast.makeText(this@MainActivity, "再按一次返回键退出", Toast.LENGTH_SHORT).show()
                 }
             }
@@ -130,6 +142,7 @@ class MainActivity : ComponentActivity() {
 fun WebContent(serverAvailable: Boolean, modifier: Modifier = Modifier) {
     AndroidView(factory = { ctx ->
         WebView(ctx).apply {
+            activeWebView = WeakReference(this)
             settings.javaScriptEnabled = true
             settings.domStorageEnabled = true
             // 不要开 useWideViewPort / loadWithOverviewMode：

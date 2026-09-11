@@ -87,6 +87,11 @@ app/src/main/assets/www/
 | `setLayerType` | 不设置 | 手动指定 `LAYER_TYPE_HARDWARE` 在部分 GPU 驱动/模拟器上导致白屏 |
 | `mediaPlaybackRequiresUserGesture` | `false` | 允许游戏自动播放音频 |
 
+### 返回键行为
+
+- **单击返回键**：向页面派发 Cordova 风格的 `backbutton` 事件，并 Toast 提示"再按一次返回键退出"。Web-Packer 注入的 `controls.js` 触屏键盘只在 `backbutton` 事件里呼出/切换（浏览器 `keydown` 在 Android 返回键上不会触发）；没有监听器的页面则完全无感
+- **双击返回键（2 秒内）**：退出应用，防止游戏中误触杀进程
+
 ### 诊断能力
 
 调试期开着，发布前可关：
