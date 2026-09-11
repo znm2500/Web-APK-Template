@@ -10,6 +10,8 @@ import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import android.widget.Toast
+import androidx.activity.OnBackPressedCallback
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.core.view.WindowInsetsCompat
@@ -95,6 +97,20 @@ class MainActivity : ComponentActivity() {
             Log.e("MainActivity", "Failed to start LocalWebServer", e)
         }
 
+        // 双击返回键才退出，防止游戏中误触直接杀进程
+        onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
+            private var lastBackPressTime = 0L
+            override fun handleOnBackPressed() {
+                val now = System.currentTimeMillis()
+                if (now - lastBackPressTime < 2000) {
+                    finish()
+                } else {
+                    lastBackPressTime = now
+                    Toast.makeText(this@MainActivity, "再按一次返回键退出", Toast.LENGTH_SHORT).show()
+                }
+            }
+        })
+
         setContent {
             MyApplicationTheme {
                 // Use a WebView to load the local server root (fallback to assets file if server unavailable)
@@ -178,7 +194,7 @@ fun WebContent(serverAvailable: Boolean, modifier: Modifier = Modifier) {
 
                 override fun onRenderProcessGone(view: WebView?, detail: RenderProcessGoneDetail?): Boolean {
                     // 渲染进程（含 GPU 合成）崩溃时 WebView 会定格/白屏，但音频进程可能还在跑
-                    Log.e("WebContentDebug", "onRenderProcessGone, didCrash=${detail?.didCrash()}")
+                    Log.e("WebContentDebug", "onRenderProcessGone, detail=$detail")
                     return true
                 }
 
