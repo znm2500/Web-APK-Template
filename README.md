@@ -36,11 +36,35 @@ app/src/main/assets/www/
 ### 3. 构建
 
 ```bash
-./gradlew :app:assembleDebug     # 调试包，可直接安装
-./gradlew :app:assembleRelease   # 发布包（默认使用 debug 证书签名，可安装测试）
+./gradlew :app:assembleDebug     # 调试包：不混淆，堆栈可读，适合排查游戏兼容问题
+./gradlew :app:assembleRelease   # 发布包：开 R8 + 资源压缩，用作打包模板
 ```
 
 产物：`app/build/outputs/apk/{debug,release}/`
+
+> release 包默认使用 debug 证书签名（可安装测试，上架需换正式证书）。
+
+---
+
+## 体积设计
+
+这个壳刻意做到"没有多余的代码"，实测体积：
+
+| 版本 | 体积 | 说明 |
+|---|---|---|
+| 改造前（AS 默认模板依赖全开、不混淆） | 25.0 MB | 37294 个类，其中自己的代码只有 22 个 |
+| 现在 · debug | 933 KB | 不混淆 |
+| 现在 · release（R8 压缩） | **65 KB** | dex 仅 38 个类 |
+
+之所以能这么小，是因为三件事：
+
+1. **不打包浏览器内核**——渲染完全交给系统自带的 WebView（Chromium），APK 里一个字节的渲染引擎都没有
+2. **不打包 UI 框架**——全程 `android.app.Activity` + 一个铺满屏幕的 `WebView`，没有 Compose / AndroidX / Material
+3. **release 开 R8 + 资源压缩**——用不到的类和资源全部剔除，剩余类名混淆、打包时再压缩
+
+唯一的功能依赖是 `org.nanohttpd:nanohttpd:2.3.1`（本地 HTTP 服务，约 30 个类）。整个壳的源码 500 行左右，全部集中在两个文件。
+
+因此产物大小基本由你放进去的游戏决定：换一个 33MB 的单文件游戏，APK 就是 33MB 上下，壳本身可以忽略不计。
 
 ---
 
@@ -114,16 +138,42 @@ probe: GL=OK | VP=640x360 | CHAIN=... | RELAYOUT=function-called | APP_AFTER=640
 
 ---
 
+## 资源请求 404 时的行为
+
+壳里的资源全部来自内置服务器（`assets/www`），找不到文件时服务器返回 `404 text/plain "Not found"`。WebView 侧分三种情况，分清它们能省下大量排查时间：
+
+| 情况 | 屏幕上的表现 | 壳的动作 |
+|---|---|---|
+| **子资源 404**（脚本 / 图片 / 音频） | 页面照常运行，只是那个资源缺失。缺 `script.js` 会白屏无反应，缺图缺音频只影响对应内容 | 不中断、不重载（刻意如此），把 `子资源 HTTP 404: <URL>` 打进 logcat |
+| **主文档 404**（`assets/www` 里没有 `index.html`） | 直接把 `Not found` 当成页面显示 | 打 `主文档 HTTP 404`，**不会**回退 `file://` |
+| **网络层失败**（服务器没起来 / 端口被占） | 白屏 | 回退 `file:///android_asset/www/index.html`，且**只回退一次**，避免反复回退的死循环 |
+
+两个反直觉的点：
+
+- **HTTP 404 不触发 `onReceivedError`**，它走 `onReceivedHttpError`。所以"主文档加载失败就回退 file://"在 404 场景下并不会发生——回退只针对网络层错误
+- **assets 里的文件名区分大小写**：游戏在 Windows 上引用 `Script.js` 而实际文件叫 `script.js` 时，电脑上跑得好好的，打包后必定 404。现在日志会直接打出是哪个 URL 挂了
+
+文件名含 `+`、中文、空格的资源都能正常访问（解码时 `+` 按字面处理，不会被当成空格）。
+
+排查命令：
+
+```bash
+adb logcat -s WebContentDebug | grep -E "HTTP 4|error"
+```
+
+---
+
 ## 项目结构
 
 ```
 app/src/main/
 ├── assets/www/                         游戏资源（唯一需要替换的目录）
 ├── java/com/example/myapplication/
-│   ├── MainActivity.kt                 WebView 容器、启动补丁注入、诊断探针
+│   ├── MainActivity.kt                 Activity + WebView 容器、启动补丁注入、诊断探针
 │   └── LocalWebServer.kt               基于 NanoHTTPD 的 assets 文件服务
 └── res/
     ├── mipmap-*/                       各密度启动图标
+    ├── values/themes.xml               平台主题（不是 MaterialComponents，避免拉依赖）
     └── drawable/ic_launcher_background.xml   自适应图标背景色
 ```
 
@@ -139,6 +189,8 @@ app/src/main/
 
 ## 已知限制
 
-- `file://` 回退路径不经过 `shouldInterceptRequest`，启动补丁仅在 HTTP 主路径生效（此时靠 `onPageFinished` 探针兜底修复，不会白屏）
+- `file://` 回退只在网络层失败时触发；回退页面能否享受启动补丁取决于系统 WebView 是否对 `file://` 调用 `shouldInterceptRequest`，因此不保证生效——但 `onPageFinished` 探针会兜底做同样的容器尺寸修复，不会白屏。回退只尝试一次，不会死循环
+- release 包经过 R8 混淆，类名与行号需要 `app/build/outputs/mapping/release/mapping.txt` 才能还原堆栈；排查问题请优先用 debug 包
+- 返回键只做事件转发，应用无法用返回键退出，需要系统手势或任务列表划掉
 - release 包默认使用 debug 证书签名，仅适合本地测试分发；上架应用商店需替换为正式证书
 - 需要联网的游戏（云变量、在线资源）依赖设备网络，`INTERNET` 权限已声明

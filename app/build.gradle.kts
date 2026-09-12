@@ -1,8 +1,5 @@
 plugins {
     alias(libs.plugins.android.application)
-    alias(libs.plugins.kotlin.compose)
-    alias(libs.plugins.google.devtools.ksp)
-    alias(libs.plugins.jetbrains.kotlin.plugin.serialization)
 }
 
 android {
@@ -25,11 +22,18 @@ android {
     }
 
     buildTypes {
+        debug {
+            // 调试包不混淆：构建快、崩溃堆栈可读，方便排查游戏兼容问题
+            isMinifyEnabled = false
+            isShrinkResources = false
+        }
         release {
             // 用 debug 证书签名 release：模板壳的定位是"塞游戏即出包"，
             // 与 Web-Packer 的 APK 模板一致（debug 签名可安装测试，上架再换正式证书）
             signingConfig = signingConfigs.getByName("debug")
-            isMinifyEnabled = false
+            // R8 + 资源压缩：壳用不到的类、资源全部剔除（这是把空壳从 25MB 压到 1MB 级的开关）
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -40,62 +44,16 @@ android {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
-    buildFeatures {
-        compose = true
-    }
 }
 
 dependencies {
-    implementation(platform(libs.androidx.compose.bom))
-    implementation(libs.accompanist.permissions)
-    implementation(libs.androidx.activity.compose)
-    implementation(libs.androidx.camera.camera2)
-    implementation(libs.androidx.camera.core)
-    implementation(libs.androidx.camera.lifecycle)
-    implementation(libs.androidx.camera.view)
-    implementation(libs.androidx.compose.adaptive)
-    implementation(libs.androidx.compose.adaptive.layout)
-    implementation(libs.androidx.compose.adaptive.navigation3)
-    implementation(libs.androidx.compose.material.icons.core)
-    implementation(libs.androidx.compose.material.icons.extended)
-    implementation(libs.androidx.compose.material3)
-    implementation(libs.androidx.compose.ui)
-    implementation(libs.androidx.compose.ui.graphics)
-    implementation(libs.androidx.compose.ui.tooling.preview)
-    implementation(libs.androidx.core.ktx)
-    implementation(libs.androidx.datastore.preferences)
-    implementation(libs.androidx.lifecycle.runtime.compose)
-    implementation(libs.androidx.lifecycle.runtime.ktx)
-    implementation(libs.androidx.lifecycle.viewmodel.compose)
-    implementation(libs.androidx.lifecycle.viewmodel.navigation3)
-    implementation(libs.androidx.navigation3.runtime)
-    implementation(libs.androidx.navigation3.ui)
-    implementation(libs.androidx.room.ktx)
-    implementation(libs.androidx.room.runtime)
-    implementation(libs.coil.compose)
-    implementation(libs.converter.moshi)
-    implementation(libs.kotlinx.coroutines.android)
-    implementation(libs.kotlinx.coroutines.core)
-    implementation(libs.kotlinx.serialization.core)
-    implementation(libs.logging.interceptor)
-    implementation(libs.material)
-    implementation(libs.moshi.kotlin)
-    implementation(libs.okhttp)
-    // Lightweight embedded HTTP server to serve local game files
-    implementation("org.nanohttpd:nanohttpd:2.3.1")
-    implementation(libs.play.services.location)
-    implementation(libs.retrofit)
-    testImplementation(libs.androidx.core)
-    testImplementation(libs.androidx.junit)
+    // 唯一的功能依赖：轻量嵌入式 HTTP 服务器（编译后仅约 30 个类）。
+    // 壳只做三件事——给文件来源、给 WebView 容器、内存注入启动补丁——
+    // 渲染与游戏运行时全部由系统 WebView（Chromium）提供，不需要任何 UI 框架。
+    implementation(libs.nanohttpd)
+
     testImplementation(libs.junit)
-    testImplementation(libs.kotlinx.coroutines.test)
-    androidTestImplementation(platform(libs.androidx.compose.bom))
-    androidTestImplementation(libs.androidx.compose.ui.test.junit4)
-    androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(libs.androidx.junit)
+    androidTestImplementation(libs.androidx.core)
     androidTestImplementation(libs.androidx.runner)
-    debugImplementation(libs.androidx.compose.ui.test.manifest)
-    debugImplementation(libs.androidx.compose.ui.tooling)
-    "ksp"(libs.androidx.room.compiler)
-    "ksp"(libs.moshi.kotlin.codegen)
 }

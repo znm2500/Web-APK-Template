@@ -1,4 +1,8 @@
 <resources>
 
-    <style name="Theme.MyApplication" parent="Theme.MaterialComponents.Light" />
+    <!-- 用平台自带主题，避免把 com.google.android.material 整条依赖链拉进 APK。
+         windowBackground 涂黑：启动瞬间与页面同色，避免白闪（页面首帧也被补丁刷黑）。 -->
+    <style name="Theme.MyApplication" parent="@android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@android:color/black</item>
+    </style>
 </resources>

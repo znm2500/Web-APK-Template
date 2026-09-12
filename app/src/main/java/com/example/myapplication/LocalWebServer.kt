@@ -12,8 +12,11 @@ import java.io.InputStream
 class LocalWebServer(private val assets: AssetManager, port: Int = 8080) : NanoHTTPD(port) {
     override fun serve(session: IHTTPSession): Response {
         var uri = session.uri.trimStart('/')
-        // URL 解码（中文/空格文件名）并去掉可能的查询串
-        uri = java.net.URLDecoder.decode(uri, "UTF-8").substringBefore('?')
+        // 先切掉查询串（原始 '?' 才是分隔符，解码后的 %3F 属于文件名），
+        // 再做 URL 解码（中文/空格文件名）。注意 URLDecoder 是表单语义，会把 '+' 当空格，
+        // 路径里的 '+' 必须按字面处理，所以先把 '+' 转义成 %2B 再解码。
+        uri = uri.substringBefore('?')
+        uri = java.net.URLDecoder.decode(uri.replace("+", "%2B"), "UTF-8")
         if (uri.isEmpty() || uri.endsWith("/")) {
             uri += "index.html"
         }
