@@ -89,8 +89,7 @@ app/src/main/assets/www/
 
 ### 返回键行为
 
-- **单击返回键**：向页面派发 Cordova 风格的 `backbutton` 事件，并 Toast 提示"再按一次返回键退出"。Web-Packer 注入的 `controls.js` 触屏键盘只在 `backbutton` 事件里呼出/切换（浏览器 `keydown` 在 Android 返回键上不会触发）；没有监听器的页面则完全无感
-- **双击返回键（2 秒内）**：退出应用，防止游戏中误触杀进程
+返回键完全交给页面：单击即向页面派发 Cordova 风格的 `backbutton` 事件，**不退出、不提示**。Web-Packer 注入的 `controls.js` 触屏键盘只在 `backbutton` 事件里呼出/切换（浏览器 `keydown` 在 Android 返回键上不会触发）；没有监听器的页面则完全无感（返回键无任何反应，只能靠系统手势/任务列表退出）。
 
 ### 诊断能力
 

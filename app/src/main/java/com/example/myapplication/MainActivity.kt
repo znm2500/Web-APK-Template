@@ -10,7 +10,6 @@ import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import android.webkit.WebViewClient
-import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
 import java.lang.ref.WeakReference
 import androidx.core.view.WindowCompat
@@ -102,24 +101,15 @@ class MainActivity : ComponentActivity() {
             Log.e("MainActivity", "Failed to start LocalWebServer", e)
         }
 
-        // 双击返回键才退出，防止游戏中误触直接杀进程。
-        // 单击返回键时，向页面派发 Cordova 风格的 backbutton 事件：
+        // 返回键完全交给页面：向页面派发 Cordova 风格的 backbutton 事件，不退出、不提示。
         // Web-Packer 注入的 controls.js 只在 backbutton 事件里呼出/切换触屏键盘
         // （浏览器 keydown 在 Android 返回键上不会触发，不派发的话键盘永远呼不出）。
-        // 对没有 controls.js 的页面，派发一个无人监听的事件完全无害。
+        // 对没有 controls.js 的页面，派发一个无人监听的事件完全无害（返回键将无任何反应）。
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
-            private var lastBackPressTime = 0L
             override fun handleOnBackPressed() {
-                val now = System.currentTimeMillis()
-                if (now - lastBackPressTime < 2000) {
-                    finish()
-                } else {
-                    lastBackPressTime = now
-                    activeWebView?.get()?.evaluateJavascript(
-                        "document.dispatchEvent(new Event('backbutton'))", null
-                    )
-                    Toast.makeText(this@MainActivity, "再按一次返回键退出", Toast.LENGTH_SHORT).show()
-                }
+                activeWebView?.get()?.evaluateJavascript(
+                    "document.dispatchEvent(new Event('backbutton'))", null
+                )
             }
         })
 
